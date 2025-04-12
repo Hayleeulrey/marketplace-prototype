@@ -10,6 +10,8 @@ export async function GET(request: Request) {
     const maxPrice = searchParams.get("maxPrice")
     const rating = searchParams.get("rating")
 
+    console.log("Fetching courses with params:", { category, format, minPrice, maxPrice, rating })
+
     const supabase = createServerActionClient()
 
     let query = supabase
@@ -35,8 +37,6 @@ export async function GET(request: Request) {
 
     // Apply filters if provided
     if (category) {
-      // In a real app, you'd have a categories table or field
-      // This is just a placeholder for demonstration
       query = query.ilike("title", `%${category}%`)
     }
 
@@ -52,18 +52,26 @@ export async function GET(request: Request) {
       query = query.lte("price", maxPrice)
     }
 
+    console.log("Executing Supabase query...")
     const { data, error } = await query
 
     if (error) {
       console.error("Error fetching courses:", error)
-      return NextResponse.json({ error: "Failed to fetch courses" }, { status: 500 })
+      return NextResponse.json({ error: "Failed to fetch courses", details: error.message }, { status: 500 })
+    }
+
+    console.log(`Successfully fetched ${data?.length || 0} courses`)
+
+    // If no data is returned but also no error, return an empty array
+    if (!data || data.length === 0) {
+      return NextResponse.json([])
     }
 
     // Calculate average rating for each course
     const coursesWithRating = data
       .map((course) => {
         const reviews = course.reviews || []
-        const totalRating = reviews.reduce((sum: number, review: any) => sum + review.rating, 0)
+        const totalRating = reviews.reduce((sum: number, review: any) => sum + (review.rating || 0), 0)
         const averageRating = reviews.length > 0 ? totalRating / reviews.length : 0
 
         // Filter by rating if provided
@@ -75,14 +83,17 @@ export async function GET(request: Request) {
           ...course,
           average_rating: averageRating,
           reviews_count: reviews.length,
-          next_session: course.course_sessions[0] || null,
+          next_session: course.course_sessions?.[0] || null,
         }
       })
       .filter(Boolean)
 
     return NextResponse.json(coursesWithRating)
   } catch (error) {
-    console.error("Unexpected error:", error)
-    return NextResponse.json({ error: "An unexpected error occurred" }, { status: 500 })
+    console.error("Unexpected error in courses API:", error)
+    return NextResponse.json(
+      { error: "An unexpected error occurred", details: error instanceof Error ? error.message : String(error) },
+      { status: 500 },
+    )
   }
 }
