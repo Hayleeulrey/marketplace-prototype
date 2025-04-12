@@ -1,8 +1,25 @@
-import { NextResponse } from "next/server"
+import { NextResponse } from "next/dist/server/web/spec-extension/response"
+import { type NextRequest } from 'next/dist/server/web/spec-extension/request'
 import { createServerActionClient } from "@/lib/db"
 
 export async function GET(request: Request) {
   try {
+    const supabase = createServerActionClient()
+    
+    // Test the Supabase connection first
+    const { data: testData, error: testError } = await supabase
+      .from('courses')
+      .select('count')
+      .limit(1)
+
+    if (testError) {
+      console.error("Supabase connection test failed:", testError)
+      return NextResponse.json(
+        { error: "Database connection failed", details: testError.message },
+        { status: 500 }
+      )
+    }
+
     const { searchParams } = new URL(request.url)
     const category = searchParams.get("category")
     const format = searchParams.get("format")
@@ -11,8 +28,6 @@ export async function GET(request: Request) {
     const rating = searchParams.get("rating")
 
     console.log("Fetching courses with params:", { category, format, minPrice, maxPrice, rating })
-
-    const supabase = createServerActionClient()
 
     let query = supabase
       .from("courses")
@@ -92,8 +107,15 @@ export async function GET(request: Request) {
   } catch (error) {
     console.error("Unexpected error in courses API:", error)
     return NextResponse.json(
-      { error: "An unexpected error occurred", details: error instanceof Error ? error.message : String(error) },
-      { status: 500 },
+      { 
+        error: "An unexpected error occurred", 
+        details: error instanceof Error ? error.message : String(error),
+        env: {
+          hasUrl: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
+          hasKey: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+        }
+      },
+      { status: 500 }
     )
   }
 }
