@@ -2,6 +2,8 @@ import { NextResponse } from "next/dist/server/web/spec-extension/response"
 import { type NextRequest } from 'next/dist/server/web/spec-extension/request'
 import { createServerActionClient } from "@/lib/db"
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: Request) {
   try {
     const supabase = createServerActionClient()
@@ -45,7 +47,9 @@ export async function GET(request: Request) {
           end_time
         ),
         reviews (
-          rating
+          id,
+          rating,
+          comment
         )
       `)
       .eq("status", "active")
